@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"tbibi_back_end_go/auth"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 
 
 type Doctor struct {
+	DoctorID      string `json:"DoctorId"`
     Username      string `json:"Username"`
     FirstName     string `json:"FirstName"`
     LastName      string `json:"LastName"`
@@ -35,7 +37,9 @@ type Doctor struct {
     ZipCode       string `json:"ZipCode"`
     CountryName string `json:"CountryName"`
     BirthDate     string `json:"BirthDate"`
-    Location      string `json:"location"`
+    Location      string `json:"Location"`
+	RatingScore   *float32 `json:"RatingScore"`
+	RatingCount   int `json:"RatingCount"`
 }
 
 func SetupDoctorRoutes(r *gin.Engine, pool *pgxpool.Pool) {
@@ -48,7 +52,13 @@ func SetupDoctorRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 		LoginDoctor(c, pool)
 	})
 
+	r.GET("/api/v1/doctors/:doctorId", func(c *gin.Context) {
+		GetDoctorById(c, pool)
+	})
 
+	r.GET("/api/v1/doctors", func(c *gin.Context) {
+		GetAllDoctors(c, pool)
+	})
 	
 }
 
@@ -244,14 +254,108 @@ func LoginDoctor(c *gin.Context, pool *pgxpool.Pool) {
 	}
 
 	// get user id 
-	var doctorId string
 	err = pool.QueryRow(ctx, "SELECT doctor_id FROM doctor_info WHERE email = $1", loginReq.Email).Scan(
-		&doctorId,
+		&doctor.DoctorID,
 	)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Invalid email or password"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "token": token, "doctor_id": doctorId})
+	c.JSON(http.StatusOK, gin.H{"success": true, "token": token, "doctor_id": doctor.DoctorID})
+}
+
+
+
+func GetDoctorById(c *gin.Context, pool *pgxpool.Pool) {
+    doctorId := c.Param("doctorId")  
+	var doctor Doctor
+	doctor.DoctorID = doctorId
+
+    err := pool.QueryRow(context.Background(), "SELECT email, phone_number, first_name, last_name, TO_CHAR(birth_date, 'YYYY-MM-DD'), doctor_bio, sex, location, specialty, rating_score, rating_count  FROM doctor_info WHERE doctor_id = $1", doctor.DoctorID).Scan(
+        &doctor.Email,
+        &doctor.PhoneNumber,
+        &doctor.FirstName, 
+        &doctor.LastName,
+        &doctor.BirthDate,
+        &doctor.DoctorBio,
+        &doctor.Sex,
+		&doctor.Location,
+		&doctor.Specialty,
+		&doctor.RatingScore,
+		&doctor.RatingCount,
+    )
+    
+    if err != nil {
+        if err.Error() == "no rows in result set" {
+            c.JSON(http.StatusNotFound, gin.H{"error": "Patient not found"})
+        } else {
+            log.Println("Database error:", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+        }
+        return
+    }
+
+    c.JSON(http.StatusOK, doctor) 
+}
+
+
+
+func GetAllDoctors(c *gin.Context, pool *pgxpool.Pool) {
+	var doctors []Doctor
+	query := c.DefaultQuery("query", "")
+	specialty := c.DefaultQuery("specialty", "")
+	location := c.DefaultQuery("location", "")
+
+	sqlQuery := "SELECT doctor_id, username, first_name, last_name, specialty, experience, rating_score,rating_count, location FROM doctor_info"
+	var conditions []string
+	var queryParams []interface{}
+
+	if query != "" || specialty != "" || location != "" {
+		sqlQuery += " WHERE "
+		if query != "" {
+			conditions = append(conditions, fmt.Sprintf("(first_name ILIKE $%d OR last_name ILIKE $%d)", len(queryParams)+1, len(queryParams)+1))
+			queryParams = append(queryParams, "%"+query+"%", "%"+query+"%")
+		}
+		if specialty != "" {
+			conditions = append(conditions, fmt.Sprintf("specialty ILIKE $%d", len(queryParams)+1))
+			queryParams = append(queryParams, "%"+specialty+"%")
+		}
+		if location != "" {
+			conditions = append(conditions, fmt.Sprintf("location ILIKE $%d", len(queryParams)+1))
+			queryParams = append(queryParams, "%"+location+"%")
+		}
+		sqlQuery += strings.Join(conditions, " AND ")
+	}
+
+	rows, err := pool.Query(context.Background(), sqlQuery, queryParams...)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+	
+	for rows.Next() {
+		var doctor Doctor
+		err := rows.Scan(
+			&doctor.DoctorID, 
+			&doctor.Username, 
+			&doctor.FirstName, 
+			&doctor.LastName, 
+			&doctor.Specialty, 
+			&doctor.Experience, 
+			&doctor.RatingScore, 
+			&doctor.RatingCount,  
+			&doctor.Location,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
+			return
+		}
+		log.Println(doctor)
+		doctors = append(doctors, doctor)
+	}
+
+	c.JSON(http.StatusOK, doctors)
 }
