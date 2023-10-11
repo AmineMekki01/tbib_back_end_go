@@ -36,6 +36,7 @@ func main() {
 	// Initialize routes
 	routes.SetupPatientRoutes(r, conn)
 	routes.SetupDoctorRoutes(r, conn)
+	routes.SetupAppointmentManagementRoutes(r, conn)
 
 	r.Use(func(c *gin.Context) {
         for k, v := range c.Writer.Header() {
