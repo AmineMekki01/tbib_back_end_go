@@ -149,7 +149,9 @@ func GetReservations(c *gin.Context, pool *pgxpool.Pool) {
 			doctor_info.specialty,
 			patient_info.first_name AS patient_first_name,
 			patient_info.last_name AS patient_last_name,
-			patient_info.age
+			patient_info.age,
+			patient_info.patient_id,
+			doctor_info.doctor_id
 		FROM 
 			appointments
 		JOIN
@@ -183,7 +185,7 @@ func GetReservations(c *gin.Context, pool *pgxpool.Pool) {
 		var r models.Reservation
 		err := rows.Scan(&r.ReservationID, &r.ReservationStart, &r.ReservationEnd,
 			&r.DoctorFirstName, &r.DoctorLastName, &r.Specialty,
-			&r.PatientFirstName, &r.PatientLastName, &r.Age)
+			&r.PatientFirstName, &r.PatientLastName, &r.Age, &r.PatientID, &r.DoctorID)
 		if err != nil {
 			log.Println("Row Scan Error:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})

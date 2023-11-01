@@ -19,4 +19,6 @@ type Reservation struct {
 	PatientFirstName string    `json:"patient_first_name"`
 	PatientLastName  string    `json:"patient_last_name"`
 	Age              int       `json:"age"`
+	PatientID        string    `json:"patient_id"`
+	DoctorID         string    `json:"doctor_id"`
 }
