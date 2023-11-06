@@ -19,10 +19,9 @@ func InitDatabase() (*pgxpool.Pool, error) {
 	port := os.Getenv("DATABASE_PORT")
 	user := os.Getenv("DATABASE_USER")
 	password := os.Getenv("DATABASE_PASSWORD")
-	database := os.Getenv("DATABASE_NAME")
+	database_name := os.Getenv("DATABASE_NAME")
 
-
-	config, err := pgxpool.ParseConfig(" host=" + host + " port=" + port + " user=" + user + " password=" + password + " dbname=" + database)
+	config, err := pgxpool.ParseConfig(" host=" + host + " port=" + port + " user=" + user + " password=" + password + " database=" + database_name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config: %v", err)
 	}
@@ -118,12 +117,6 @@ func InitDatabase() (*pgxpool.Pool, error) {
 			type VARCHAR(50) NOT NULL,
 			user_id uuid NOT NULL,
 			user_type VARCHAR(50) NOT NULL
-		)`,
-
-		`CREATE TABLE IF NOT EXISTS verification_tokens (
-			id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-			email VARCHAR(50) NOT NULL,
-			token VARCHAR(50) NOT NULL,
 		)`,
 
 	}
