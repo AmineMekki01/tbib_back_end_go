@@ -37,6 +37,9 @@ func main() {
 	routes.SetupPatientRoutes(r, conn)
 	routes.SetupDoctorRoutes(r, conn)
 	routes.SetupAppointmentManagementRoutes(r, conn)
+	routes.SetupFileRoutes(r, conn)
+	routes.SetupAccountValidationRoutes(r, conn)
+
 
 	r.Use(func(c *gin.Context) {
         for k, v := range c.Writer.Header() {
