@@ -203,10 +203,24 @@ func LoginDoctor(c *gin.Context, pool *pgxpool.Pool) {
 		return
 	}
 
+	// check if the account is verified
+	var isVerified bool
+	ctx := context.Background()
+	err := pool.QueryRow(ctx, "SELECT is_verified FROM doctor_info WHERE email = $1", loginReq.Email).Scan(&isVerified)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Account Not Verified"})
+		return	
+	}
+
+	if !isVerified {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Account Not Verified, Please check your email to verify your account."})
+		return
+	}
+
 	// Fetch the doctor from the database based on the email
 	var doctor models.Doctor
-	ctx := context.Background()
-	err := pool.QueryRow(ctx, "SELECT email, hashed_password FROM doctor_info WHERE email = $1", loginReq.Email).Scan(
+	ctx = context.Background()
+	err = pool.QueryRow(ctx, "SELECT email, hashed_password FROM doctor_info WHERE email = $1", loginReq.Email).Scan(
 	&doctor.Email,
 	&doctor.Password,
 	)
