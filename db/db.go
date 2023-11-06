@@ -3,12 +3,26 @@ package db
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/joho/godotenv"
 )
 
 func InitDatabase() (*pgxpool.Pool, error) {
-	config, err := pgxpool.ParseConfig("host=localhost port=5433 user=postgres password=Amine-1963 database=tbibi_app")
+
+	if err := godotenv.Load(); err != nil {
+        log.Fatalf("Error loading .env file: %v", err)
+    }
+	host := os.Getenv("DATABASE_HOST")
+	port := os.Getenv("DATABASE_PORT")
+	user := os.Getenv("DATABASE_USER")
+	password := os.Getenv("DATABASE_PASSWORD")
+	database := os.Getenv("DATABASE_NAME")
+
+
+	config, err := pgxpool.ParseConfig(" host=" + host + " port=" + port + " user=" + user + " password=" + password + " dbname=" + database)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config: %v", err)
 	}
@@ -93,6 +107,23 @@ func InitDatabase() (*pgxpool.Pool, error) {
 			title VARCHAR(50) NOT NULL,
 			doctor_id uuid REFERENCES doctor_info(doctor_id),
 			patient_id uuid REFERENCES patient_info(patient_id)
+		)`,
+	
+
+		`CREATE TABLE IF NOT EXISTS folder_info (
+			folder_id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+			name VARCHAR(50) NOT NULL,
+			created_at TIMESTAMP NOT NULL,
+			updated_at TIMESTAMP NOT NULL,
+			type VARCHAR(50) NOT NULL,
+			user_id uuid NOT NULL,
+			user_type VARCHAR(50) NOT NULL
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS verification_tokens (
+			id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+			email VARCHAR(50) NOT NULL,
+			token VARCHAR(50) NOT NULL,
 		)`,
 
 	}
