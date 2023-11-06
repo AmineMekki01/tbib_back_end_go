@@ -1,10 +1,10 @@
 package models
 
 type Patient struct {
-	Username      string `json:"Username"`
-	Password      string `json:"Password"`
-	Email         string `json:"Email"`
-	Age           int    `json:"Age"`
+	Username string `json:"Username"`
+	Password string `json:"Password"`
+	Email    string `json:"Email"`
+	// Age           int    `json:"Age"`
 	PhoneNumber   string `json:"PhoneNumber"`
 	FirstName     string `json:"FirstName"`
 	LastName      string `json:"LastName"`
@@ -16,5 +16,5 @@ type Patient struct {
 	CountryName   string `json:"CountryName"`
 	PatientBio    string `json:"PatientBio"`
 	Sex           string `json:"sex"`
-	Location      string `json:"location"`
+	// Location      string `json:"location"`
 }

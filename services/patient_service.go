@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"tbibi_back_end_go/auth"
 	"tbibi_back_end_go/models"
+	"tbibi_back_end_go/validators"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,7 +19,9 @@ import (
 
 func GetPatientById(c *gin.Context, pool *pgxpool.Pool) {
     patientId := c.Param("patientId")  
+	log.Println("Fetching patient with id: ", patientId)
     var patient models.Patient
+	var location string
     err := pool.QueryRow(context.Background(), "SELECT email, phone_number, first_name, last_name, TO_CHAR(birth_date, 'YYYY-MM-DD'), patient_bio, sex, location  FROM patient_info WHERE patient_id = $1", patientId).Scan(
         &patient.Email,
         &patient.PhoneNumber,
@@ -27,7 +30,7 @@ func GetPatientById(c *gin.Context, pool *pgxpool.Pool) {
         &patient.BirthDate,
         &patient.PatientBio,
         &patient.Sex,
-		&patient.Location,
+		&location,
     )
     
     if err != nil {
@@ -45,11 +48,15 @@ func GetPatientById(c *gin.Context, pool *pgxpool.Pool) {
 
 
 func RegisterPatient(c *gin.Context, pool *pgxpool.Pool) {
-    var patient models.Patient
+
+	var patient models.Patient
+
     if err := c.ShouldBindJSON(&patient); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
-        return
-    }
+		log.Printf("Error binding JSON: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format", "details": err.Error()})
+		return
+	}
+	log.Printf("Received patient data: %+v", patient)
 
 	conn, err := pool.Acquire(c)
 	if err != nil {
@@ -60,9 +67,11 @@ func RegisterPatient(c *gin.Context, pool *pgxpool.Pool) {
 
 	// checking if the gmail already exists
 	var email string
-	err = conn.QueryRow(c, "SELECT email FROM patient_info WHERE email = $1", patient.Email).Scan(&email)
-
+	queryString := "SELECT email FROM patient_info WHERE email = $1"
+	log.Printf("Executing query: %s with email: %s", queryString, patient.Email)
+	err = conn.QueryRow(c, queryString, patient.Email).Scan(&email)
 	if err != nil {
+		log.Printf("Query error: %v", err)
 		if err.Error() != "no rows in result set" {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 			return
@@ -86,8 +95,6 @@ func RegisterPatient(c *gin.Context, pool *pgxpool.Pool) {
 		return
 	}
 
-		
-	
 	// Generating Salt and Hash Password
 	saltBytes := make([]byte, 16)
 	_, err = rand.Read(saltBytes)
@@ -109,10 +116,10 @@ func RegisterPatient(c *gin.Context, pool *pgxpool.Pool) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Bad Request"})
 		return
 	}
-	patient.Age = time.Now().Year() - birthDate.Year()
+	var age = time.Now().Year() - birthDate.Year()
 
 	// Location
-	patient.Location = fmt.Sprintf("%s, %s, %s, %s, %s", patient.StreetAddress, patient.ZipCode, patient.CityName, patient.StateName, patient.CountryName)
+	var location = fmt.Sprintf("%s, %s, %s, %s, %s", patient.StreetAddress, patient.ZipCode, patient.CityName, patient.StateName, patient.CountryName)
 	_, err = conn.Exec(c, `
     INSERT INTO patient_info (
         patient_id, 
@@ -144,7 +151,7 @@ func RegisterPatient(c *gin.Context, pool *pgxpool.Pool) {
     patient.Username, 
     patient.FirstName, 
     patient.LastName, 
-    patient.Age, 
+    age, 
     patient.Sex, 
     hashedPassword, 
     salt, 
@@ -159,14 +166,34 @@ func RegisterPatient(c *gin.Context, pool *pgxpool.Pool) {
     patient.ZipCode, 
     patient.CountryName, 
     patient.BirthDate, 
-    patient.Location,
+    location,
 )
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"success": "true", "message": "Patient created successfully"})
+	verificationLink := validators.GenerateVerificationLink(patient.Email, c, pool)
+	if verificationLink == "" {
+		// Handle the error if the link couldn't be generated
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate verification link"})
+		return
+	}
+
+	// Send the verification email
+	err = validators.SendVerificationEmail(patient.Email, verificationLink) 
+	if err != nil {
+		// Log the error and send a response to the user
+		log.Printf("Failed to send verification email: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
+		return
+	}
+
+	// Respond to the user
+	c.JSON(http.StatusCreated, gin.H{
+		"success": "true",
+		"message": "Patient created successfully. Please check your email to verify your account.",
+	})
 
 }
 
@@ -183,15 +210,32 @@ func LoginPatient(c *gin.Context, pool *pgxpool.Pool) {
 		return
 	}
 
+
+	// check if the account is verified
+	var isVerified bool
+	ctx := context.Background()
+	err := pool.QueryRow(ctx, "SELECT is_verified FROM patient_info WHERE email = $1", loginReq.Email).Scan(&isVerified)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Account Not Verified"})
+		return	
+	}
+
+	// if isVerified == false then tell him to verify his account
+	if !isVerified {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Account Not Verified, Please check your email to verify your account."})
+		return
+	}
+
+
 	// Fetch the patient from the database based on the email
 	var patient models.Patient
-	ctx := context.Background()
-	err := pool.QueryRow(ctx, "SELECT email, hashed_password FROM patient_info WHERE email = $1", loginReq.Email).Scan(
+	ctx = context.Background()
+	err = pool.QueryRow(ctx, "SELECT email, hashed_password FROM patient_info WHERE email = $1", loginReq.Email).Scan(
 	&patient.Email,
 	&patient.Password,
 	)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "wwInvalid email or password"})
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Invalid email or password"})
 		return
 	}
 

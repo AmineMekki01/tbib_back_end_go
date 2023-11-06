@@ -10,6 +10,7 @@ import (
 	"strings"
 	"tbibi_back_end_go/auth"
 	"tbibi_back_end_go/models"
+	"tbibi_back_end_go/validators"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -163,11 +164,31 @@ func RegisterDoctor(c *gin.Context, pool *pgxpool.Pool) {
 	)	
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"success": "true", "message": "Doctor registered successfully"})
+	verificationLink := validators.GenerateVerificationLink(doctor.Email, c, pool)
+	if verificationLink == "" {
+		// Handle the error if the link couldn't be generated
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate verification link"})
+		return
+	}
+
+	// Send the verification email
+	err = validators.SendVerificationEmail(doctor.Email, verificationLink) 
+	if err != nil {
+		// Log the error and send a response to the user
+		log.Printf("Failed to send verification email: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
+		return
+	}
+
+	// Respond to the user
+	c.JSON(http.StatusCreated, gin.H{
+		"success": "true",
+		"message": "Doctor created successfully. Please check your email to verify your account.",
+	})
 }
 
 func doctorToAuthUser(d *models.Doctor) auth.User {
@@ -182,7 +203,7 @@ func LoginDoctor(c *gin.Context, pool *pgxpool.Pool) {
 		return
 	}
 
-	// Fetch the patient from the database based on the email
+	// Fetch the doctor from the database based on the email
 	var doctor models.Doctor
 	ctx := context.Background()
 	err := pool.QueryRow(ctx, "SELECT email, hashed_password FROM doctor_info WHERE email = $1", loginReq.Email).Scan(
@@ -243,7 +264,7 @@ func GetDoctorById(c *gin.Context, pool *pgxpool.Pool) {
     
     if err != nil {
         if err.Error() == "no rows in result set" {
-            c.JSON(http.StatusNotFound, gin.H{"error": "Patient not found"})
+            c.JSON(http.StatusNotFound, gin.H{"error": "Doctor not found"})
         } else {
             log.Println("Database error:", err)
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
