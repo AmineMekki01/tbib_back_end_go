@@ -10,5 +10,5 @@ type FolderInfo struct {
 	Type      string    `json:"file_type"`
 	UserID    string    `json:"user_id"`
 	UserType  string    `json:"user_type"`
-	ParentFolderID string `json:"parent_folder_id"`
+	ParentID *string `json:"parent_id,omitempty"`
 }

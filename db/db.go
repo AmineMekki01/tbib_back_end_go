@@ -116,7 +116,8 @@ func InitDatabase() (*pgxpool.Pool, error) {
 			updated_at TIMESTAMP NOT NULL,
 			type VARCHAR(50) NOT NULL,
 			user_id uuid NOT NULL,
-			user_type VARCHAR(50) NOT NULL
+			user_type VARCHAR(50) NOT NULL,
+			parent_id uuid REFERENCES folder_info(folder_id)
 		)`,
 
 	}
