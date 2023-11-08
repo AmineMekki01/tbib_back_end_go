@@ -24,5 +24,7 @@ func SetupFileRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 		services.GetBreadcrumbs(c, pool)
 	})
 	
-
+	r.POST("/delete-files", func(c *gin.Context) {
+    	services.DeleteFiles(c, pool)
+})
 }
