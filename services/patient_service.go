@@ -18,10 +18,12 @@ import (
 )
 
 func GetPatientById(c *gin.Context, pool *pgxpool.Pool) {
-    patientId := c.Param("patientId")  
-	log.Println("Fetching patient with id: ", patientId)
-    var patient models.Patient
+    
+	patientId := c.Param("patientId")  
+	var patient models.Patient
 	var location string
+
+	// Fetching the patient from the database based on the email
     err := pool.QueryRow(context.Background(), "SELECT email, phone_number, first_name, last_name, TO_CHAR(birth_date, 'YYYY-MM-DD'), patient_bio, sex, location  FROM patient_info WHERE patient_id = $1", patientId).Scan(
         &patient.Email,
         &patient.PhoneNumber,
@@ -32,7 +34,6 @@ func GetPatientById(c *gin.Context, pool *pgxpool.Pool) {
         &patient.Sex,
 		&location,
     )
-    
     if err != nil {
         if err.Error() == "no rows in result set" {
             c.JSON(http.StatusNotFound, gin.H{"error": "Patient not found"})
@@ -42,15 +43,13 @@ func GetPatientById(c *gin.Context, pool *pgxpool.Pool) {
         }
         return
     }
-
     c.JSON(http.StatusOK, patient) 
 }
 
 
 func RegisterPatient(c *gin.Context, pool *pgxpool.Pool) {
-
+	// Registering a new patient
 	var patient models.Patient
-
     if err := c.ShouldBindJSON(&patient); err != nil {
 		log.Printf("Error binding JSON: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format", "details": err.Error()})
@@ -175,15 +174,13 @@ func RegisterPatient(c *gin.Context, pool *pgxpool.Pool) {
 
 	verificationLink := validators.GenerateVerificationLink(patient.Email, c, pool)
 	if verificationLink == "" {
-		// Handle the error if the link couldn't be generated
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate verification link"})
 		return
 	}
 
-	// Send the verification email
+	// Sending the verification email
 	err = validators.SendVerificationEmail(patient.Email, verificationLink) 
 	if err != nil {
-		// Log the error and send a response to the user
 		log.Printf("Failed to send verification email: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
 		return
@@ -210,8 +207,7 @@ func LoginPatient(c *gin.Context, pool *pgxpool.Pool) {
 		return
 	}
 
-
-	// check if the account is verified
+	// checking if the account is verified
 	var isVerified bool
 	ctx := context.Background()
 	err := pool.QueryRow(ctx, "SELECT is_verified FROM patient_info WHERE email = $1", loginReq.Email).Scan(&isVerified)
@@ -220,14 +216,14 @@ func LoginPatient(c *gin.Context, pool *pgxpool.Pool) {
 		return	
 	}
 
-	// if isVerified == false then tell him to verify his account
+	// if isVerified == false then tell him to verify his account.
 	if !isVerified {
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "Account Not Verified, Please check your email to verify your account."})
 		return
 	}
 
 
-	// Fetch the patient from the database based on the email
+	// Fetching the patient from the database based on the email
 	var patient models.Patient
 	ctx = context.Background()
 	err = pool.QueryRow(ctx, "SELECT email, hashed_password FROM patient_info WHERE email = $1", loginReq.Email).Scan(

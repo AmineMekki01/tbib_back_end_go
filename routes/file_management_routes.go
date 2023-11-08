@@ -16,4 +16,13 @@ func SetupFileRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 		services.GetFolders(c, pool)
 	})
 
+	r.GET("/folders/:folderId/subfolders", func(c *gin.Context) {
+		services.GetSubfolders(c, pool)
+	})
+
+	r.GET("/folders/:folderId/breadcrumbs", func(c *gin.Context) {	
+		services.GetBreadcrumbs(c, pool)
+	})
+	
+
 }
