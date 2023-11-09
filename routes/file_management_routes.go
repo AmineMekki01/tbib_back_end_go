@@ -26,5 +26,9 @@ func SetupFileRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 	
 	r.DELETE("/delete-files/:folderId", func(c *gin.Context) {
     	services.DeleteFolderAndContents(c, pool)
-})
+	})
+
+	r.PATCH("/update-folder/:folderId", func(c *gin.Context) {
+		services.UpdateFolderName(c, pool)
+	})
 }

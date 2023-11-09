@@ -302,3 +302,32 @@ func DeleteFolderAndContents(c *gin.Context, pool *pgxpool.Pool) {
 
     c.JSON(http.StatusOK, gin.H{"message": "Folder and contents deleted successfully"})
 }
+
+func UpdateFolderName(c *gin.Context, pool *pgxpool.Pool) {
+    folderID := c.Param("folderId")
+    var updateRequest struct {
+        Name string `json:"name"`
+    }
+
+    if err := c.ShouldBindJSON(&updateRequest); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+        return
+    }
+
+    conn, err := pool.Acquire(c.Request.Context())
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not acquire database connection"})
+        return
+    }
+    defer conn.Release()
+
+    _, err = conn.Exec(c.Request.Context(), "UPDATE folder_info SET name = $1, updated_at = $2 WHERE folder_id = $3",
+        updateRequest.Name, time.Now(), folderID)
+
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update folder name"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "Folder name updated successfully"})
+}
