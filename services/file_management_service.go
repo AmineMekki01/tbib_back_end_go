@@ -240,10 +240,15 @@ func GetSubfolders(c *gin.Context, pool *pgxpool.Pool) {
     c.JSON(http.StatusOK, subfolders)
 }
 
-func DeleteFiles(c *gin.Context, pool *pgxpool.Pool) {
-    // Parse the JSON body to get the list of file IDs to delete
+
+func DeleteFolderAndContents(c *gin.Context, pool *pgxpool.Pool) {
+    // Parse the JSON body to get the folder ID to delete
+    folderID := c.Param("folderId")
+    log.Printf("Folder ID from URL param: %s\n", folderID)
+
+    log.Printf("Attempting to delete folder with ID: %s\n", folderID)
     var request struct {
-        FilesToDelete []string `json:"filesToDelete"`
+        FolderID string `json:"folderId"`
     }
     if err := c.ShouldBindJSON(&request); err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
@@ -258,39 +263,42 @@ func DeleteFiles(c *gin.Context, pool *pgxpool.Pool) {
     }
     defer tx.Rollback(c.Request.Context())
 
-    // Delete files from the database and filesystem
-    for _, fileID := range request.FilesToDelete {
-        // Get the file path from the database
-        
-        var fileName, userID string
-
-        log.Printf("Attempting to delete file with ID: %s\n", fileID)
-
-        err := tx.QueryRow(c.Request.Context(), "SELECT name, user_id FROM folder_info WHERE folder_id = $1", fileID).Scan(&fileName, &userID)
-        if err != nil {
-            log.Printf("Error retrieving file path for file ID %s: %v\n", fileID, err)
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not retrieve file path"})
-            return
-        }
-        
-        // Construct the full path and delete the file from the filesystem
-        fullPath := filepath.Join("./uploads", userID, fileName) 
-        if err := os.RemoveAll(fullPath); err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not delete file from filesystem"})
-            return
-        }
-        _, err = tx.Exec(c.Request.Context(), "DELETE FROM folder_info WHERE folder_id = $1", fileID)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not delete file info"})
-            return
-        }
+    // Use a CTE to recursively get all file and folder IDs within the target folder
+    cteQuery := `
+        WITH RECURSIVE subfolders AS (
+            SELECT folder_id FROM folder_info WHERE folder_id = $1
+            UNION ALL
+            SELECT fi.folder_id FROM folder_info fi
+            INNER JOIN subfolders s ON s.folder_id = fi.parent_id
+        )
+        DELETE FROM folder_info WHERE folder_id IN (SELECT folder_id FROM subfolders);
+        `
+    // Execute the CTE query to delete all subfolders and files in the database
+    if _, err := tx.Exec(c.Request.Context(), cteQuery, request.FolderID); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not delete folder contents"})
+        return
     }
 
-    // Commit the transaction
+    // Commit the transaction - This is missing from the code snippet provided
     if err := tx.Commit(c.Request.Context()); err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not commit transaction"})
         return
     }
 
-    c.JSON(http.StatusOK, gin.H{"message": "Files deleted successfully"})
+    // Commit the transaction
+    _, err = tx.Exec(c.Request.Context(), "DELETE FROM folder_info WHERE folder_id = $1", request.FolderID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not delete root folder"})
+        return
+    }
+
+    // Delete the folder from the filesystem
+    folderPath := filepath.Join("./uploads", request.FolderID)
+    if err := os.RemoveAll(folderPath); err != nil {
+        log.Printf("Error deleting folder from filesystem: %s\n", err)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not delete folder from filesystem"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "Folder and contents deleted successfully"})
 }

@@ -16,13 +16,29 @@ func main() {
 
 	config := cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"},
-        AllowMethods:     []string{"PUT", "PATCH", "GET", "POST", "OPTIONS"},
+        AllowMethods:     []string{"PUT", "PATCH", "GET", "POST", "OPTIONS", "DELETE"}, // Include DELETE method here
         AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
         ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}
 	r.Use(cors.New(config))
+
+    // Middleware for debugging headers
+    r.Use(func(c *gin.Context) {
+        // Print request headers
+        fmt.Printf("Request %v Headers:\n", c.Request.Method)
+        for k, v := range c.Request.Header {
+            fmt.Println(k, v)
+        }
+        c.Next()
+        
+        // Print response headers
+        fmt.Printf("Response Headers:\n")
+        for k, v := range c.Writer.Header() {
+            fmt.Println(k, v)
+        }
+    })
 
 	// Initialize database
 	conn, err := db.InitDatabase()
