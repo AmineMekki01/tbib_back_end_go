@@ -109,16 +109,20 @@ func InitDatabase() (*pgxpool.Pool, error) {
 		)`,
 	
 
-		`CREATE TABLE IF NOT EXISTS folder_info (
-			folder_id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+		`CREATE TABLE IF NOT EXISTS folder_file_info (
+			id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
 			name VARCHAR(50) NOT NULL,
 			created_at TIMESTAMP NOT NULL,
 			updated_at TIMESTAMP NOT NULL,
 			type VARCHAR(50) NOT NULL,
+			size INTEGER NOT NULL,
+			extension VARCHAR(50) NOT NULL,
+			path VARCHAR(50) NOT NULL,
 			user_id uuid NOT NULL,
 			user_type VARCHAR(50) NOT NULL,
 			parent_id uuid REFERENCES folder_info(folder_id)
 		)`,
+
 
 	}
 

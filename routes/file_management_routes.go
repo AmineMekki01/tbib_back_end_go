@@ -31,4 +31,11 @@ func SetupFileRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 	r.PATCH("/update-folder/:folderId", func(c *gin.Context) {
 		services.UpdateFolderName(c, pool)
 	})
+
+	r.POST("/upload-file", func(c *gin.Context) {
+		services.UploadFile(c, pool)
+	})
+
+	r.Static("/files", "./uploads")
+
 }
