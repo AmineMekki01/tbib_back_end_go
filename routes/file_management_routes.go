@@ -38,4 +38,8 @@ func SetupFileRoutes(r *gin.Engine, pool *pgxpool.Pool) {
 
 	r.Static("/files", "./uploads")
 
+	r.GET("/download-file/:fileId", func(c *gin.Context) {
+        services.DownloadFile(c, pool)
+    })
+
 }

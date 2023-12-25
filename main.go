@@ -15,9 +15,9 @@ func main() {
 	r := gin.Default()
 
 	config := cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"},
-        AllowMethods:     []string{"PUT", "PATCH", "GET", "POST", "OPTIONS", "DELETE"}, // Include DELETE method here
-        AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
+		AllowOrigins: []string{"http://localhost:3000"},
+        AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+        AllowHeaders: []string{"Origin", "Content-Type", "Content-Length"},
         ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,

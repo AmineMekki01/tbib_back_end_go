@@ -1,9 +1,11 @@
 package services
 
 import (
+	"archive/zip"
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -524,3 +526,113 @@ func UploadFile(c *gin.Context, pool *pgxpool.Pool) {
     }
     c.JSON(http.StatusOK, gin.H{"message": "File uploaded successfully"})
 }
+
+
+func DownloadFile(c *gin.Context, pool *pgxpool.Pool) {
+    c.Header("Access-Control-Allow-Origin", "http://localhost:3000")
+    c.Header("Content-Type", "application/zip")
+    fileId := c.Param("fileId")
+
+    // Acquire a connection from the pool
+    conn, err := pool.Acquire(c.Request.Context())
+    if err != nil {
+        log.Println("Error acquiring connection:", err)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not acquire database connection"})
+        return
+    }
+    defer conn.Release()
+
+    // Retrieve file information
+    var file models.FileFolder
+    err = conn.QueryRow(c.Request.Context(), "SELECT id, name, path FROM folder_file_info WHERE id = $1", fileId).Scan(&file.ID, &file.Name, &file.Path)
+    if err != nil {
+        log.Println("Error retrieving file information:", err)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not retrieve file information"})
+        return
+    }
+
+    if file.Type == "folder" {
+        zipFilePath, err := createZipFromFolder(file.Path)
+        if err != nil {
+            log.Println("Error creating zip file:", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create zip file"})
+            return
+        }
+        
+        c.File(zipFilePath)
+        // Optionally delete the zip file after serving it
+    } else {
+        // It's a file, serve it as before
+        c.Header("Access-Control-Allow-Origin", "http://localhost:3000")
+        c.File(file.Path)
+    }
+}
+
+func createZipFromFolder(folderPath string) (string, error) {
+    zipFileName := "tempFolderZip.zip" // Generate a unique name as needed
+    zipFilePath := filepath.Join("./uploads", zipFileName)
+
+    newZipFile, err := os.Create(zipFilePath)
+    if err != nil {
+        log.Println("Error creating zip file:", err)
+        return "", err
+    }
+    defer newZipFile.Close()
+
+    zipWriter := zip.NewWriter(newZipFile)
+    defer zipWriter.Close()
+
+    // Function to recursively add files and folders to the zip
+    err = addFilesToZip(zipWriter, folderPath, "")
+    if err != nil {
+        log.Println("Error adding files to zip:", err)
+        return "", err
+    }
+
+    return zipFilePath, nil
+}
+
+func addFilesToZip(zipWriter *zip.Writer, basePath, baseInZip string) error {
+    // Walk through every file in the folder
+    files, err := ioutil.ReadDir(basePath)
+    if err != nil {
+        log.Println("Error reading directory:", err)
+        return err
+    }
+
+    for _, file := range files {
+        currentPath := filepath.Join(basePath, file.Name())
+
+        // Check if it's a directory, recursively add its files
+        if file.IsDir() {
+            newBaseInZip := filepath.Join(baseInZip, file.Name())
+            err = addFilesToZip(zipWriter, currentPath, newBaseInZip)
+            if err != nil {
+                log.Println("Error adding files to zip:", err)
+                return err
+            }
+        } else {
+            // It's a file, add it to the zip
+            data, err := ioutil.ReadFile(currentPath)
+            if err != nil {
+                log.Println("Error reading file:", err)
+                return err
+            }
+
+            f, err := zipWriter.Create(filepath.Join(baseInZip, file.Name()))
+            if err != nil {
+                log.Println("Error creating zip entry:", err)
+                return err
+            }
+            _, err = f.Write(data)
+            if err != nil {
+                log.Println("Error writing to zip entry:", err)
+                return err
+            }
+        }
+    }
+
+    return nil
+}
+
+
