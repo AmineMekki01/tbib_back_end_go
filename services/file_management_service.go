@@ -529,14 +529,15 @@ func UploadFile(c *gin.Context, pool *pgxpool.Pool) {
 
 
 func DownloadFile(c *gin.Context, pool *pgxpool.Pool) {
-    c.Header("Access-Control-Allow-Origin", "http://localhost:3000")
-    c.Header("Content-Type", "application/zip")
+    log.Println("DownloadFile function called")
+
     fileId := c.Param("fileId")
+    log.Printf("Requested file ID: %s", fileId)
 
     // Acquire a connection from the pool
     conn, err := pool.Acquire(c.Request.Context())
     if err != nil {
-        log.Println("Error acquiring connection:", err)
+        log.Printf("Error acquiring connection: %v", err)
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not acquire database connection"})
         return
     }
@@ -546,22 +547,26 @@ func DownloadFile(c *gin.Context, pool *pgxpool.Pool) {
     var file models.FileFolder
     err = conn.QueryRow(c.Request.Context(), "SELECT id, name, path FROM folder_file_info WHERE id = $1", fileId).Scan(&file.ID, &file.Name, &file.Path)
     if err != nil {
-        log.Println("Error retrieving file information:", err)
+        log.Printf("Error retrieving file information: %v", err)
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not retrieve file information"})
         return
     }
 
+    log.Printf("File Type: %s, Path: %s", file.Type, file.Path)
+
     if file.Type == "folder" {
+        log.Println("Processing as a folder")
         zipFilePath, err := createZipFromFolder(file.Path)
         if err != nil {
-            log.Println("Error creating zip file:", err)
+            log.Printf("Error creating zip file: %v", err)
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create zip file"})
             return
         }
-        
+        log.Printf("Zip file created: %s", zipFilePath)    
         c.File(zipFilePath)
         // Optionally delete the zip file after serving it
     } else {
+        log.Println("Processing as a regular file")
         // It's a file, serve it as before
         c.Header("Access-Control-Allow-Origin", "http://localhost:3000")
         c.File(file.Path)
@@ -569,12 +574,14 @@ func DownloadFile(c *gin.Context, pool *pgxpool.Pool) {
 }
 
 func createZipFromFolder(folderPath string) (string, error) {
-    zipFileName := "tempFolderZip.zip" // Generate a unique name as needed
+    log.Printf("Creating ZIP from folder: %s", folderPath)
+    zipFileName := "tempFolderZip.zip" 
     zipFilePath := filepath.Join("./uploads", zipFileName)
+    log.Printf("Zip file path: %s", zipFilePath)
 
     newZipFile, err := os.Create(zipFilePath)
     if err != nil {
-        log.Println("Error creating zip file:", err)
+        log.Printf("Error creating zip file: %v", err)
         return "", err
     }
     defer newZipFile.Close()
@@ -585,7 +592,7 @@ func createZipFromFolder(folderPath string) (string, error) {
     // Function to recursively add files and folders to the zip
     err = addFilesToZip(zipWriter, folderPath, "")
     if err != nil {
-        log.Println("Error adding files to zip:", err)
+        log.Printf("Error adding files to zip: %v", err)
         return "", err
     }
 
@@ -593,40 +600,41 @@ func createZipFromFolder(folderPath string) (string, error) {
 }
 
 func addFilesToZip(zipWriter *zip.Writer, basePath, baseInZip string) error {
-    // Walk through every file in the folder
+    log.Printf("Adding files to ZIP: BasePath: %s, BaseInZip: %s", basePath, baseInZip)
     files, err := ioutil.ReadDir(basePath)
     if err != nil {
-        log.Println("Error reading directory:", err)
+        log.Printf("Error reading directory: %v", err)
         return err
     }
 
     for _, file := range files {
         currentPath := filepath.Join(basePath, file.Name())
+        log.Printf("Processing file: %s", currentPath)
 
         // Check if it's a directory, recursively add its files
         if file.IsDir() {
             newBaseInZip := filepath.Join(baseInZip, file.Name())
             err = addFilesToZip(zipWriter, currentPath, newBaseInZip)
             if err != nil {
-                log.Println("Error adding files to zip:", err)
+                log.Printf("Error adding directory to zip: %v", err)
                 return err
             }
         } else {
             // It's a file, add it to the zip
             data, err := ioutil.ReadFile(currentPath)
             if err != nil {
-                log.Println("Error reading file:", err)
+                log.Printf("Error reading file: %v", err)
                 return err
             }
 
             f, err := zipWriter.Create(filepath.Join(baseInZip, file.Name()))
             if err != nil {
-                log.Println("Error creating zip entry:", err)
+                log.Printf("Error creating zip entry: %v", err)
                 return err
             }
             _, err = f.Write(data)
             if err != nil {
-                log.Println("Error writing to zip entry:", err)
+                log.Printf("Error writing to zip entry: %v", err)
                 return err
             }
         }

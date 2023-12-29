@@ -26,19 +26,21 @@ func main() {
 
     // Middleware for debugging headers
     r.Use(func(c *gin.Context) {
-        // Print request headers
-        fmt.Printf("Request %v Headers:\n", c.Request.Method)
-        for k, v := range c.Request.Header {
-            fmt.Println(k, v)
-        }
-        c.Next()
-        
-        // Print response headers
-        fmt.Printf("Response Headers:\n")
-        for k, v := range c.Writer.Header() {
-            fmt.Println(k, v)
-        }
-    })
+	    log.Printf("Incoming request: %s %s", c.Request.Method, c.Request.URL.Path)
+		log.Println("CORS Middleware triggered")
+    	log.Printf("Origin: %s", c.GetHeader("Origin"))
+		fmt.Printf("Request %v Headers:\n", c.Request.Method)
+		for k, v := range c.Request.Header {
+			fmt.Println(k, v)
+		}
+		c.Next()  // process request
+	
+		// After request processing
+		fmt.Printf("Response Headers:\n")
+		for k, v := range c.Writer.Header() {
+			fmt.Println(k, v)
+		}
+	})
 
 	// Initialize database
 	conn, err := db.InitDatabase()
@@ -55,6 +57,9 @@ func main() {
 	routes.SetupAppointmentManagementRoutes(r, conn)
 	routes.SetupFileRoutes(r, conn)
 	routes.SetupAccountValidationRoutes(r, conn)
+	routes.SetupShareRoutes(r, conn)
+
+
 
 
 	r.Use(func(c *gin.Context) {

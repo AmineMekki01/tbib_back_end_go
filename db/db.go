@@ -120,7 +120,15 @@ func InitDatabase() (*pgxpool.Pool, error) {
 			path VARCHAR(50) NOT NULL,
 			user_id uuid NOT NULL,
 			user_type VARCHAR(50) NOT NULL,
-			parent_id uuid REFERENCES folder_info(folder_id)
+			parent_id uuid REFERENCES folder_file_info(folder_id)
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS shared_items (
+			id SERIAL PRIMARY KEY,
+			shared_by_id VARCHAR(255) NOT NULL, 
+			shared_with_id VARCHAR(255) NOT NULL, 
+			shared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			item_id uuid REFERENCES folder_file_info(id)
 		)`,
 
 
