@@ -15,7 +15,7 @@ func main() {
 	r := gin.Default()
 
 	config := cors.Config{
-		AllowOrigins: []string{"http://localhost:3000"},
+		AllowOrigins: []string{"http://localhost:3000", "http://10.134.32.128:3000"},
         AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
         AllowHeaders: []string{"Origin", "Content-Type", "Content-Length"},
         ExposeHeaders:    []string{"Content-Length"},
@@ -33,7 +33,7 @@ func main() {
 		for k, v := range c.Request.Header {
 			fmt.Println(k, v)
 		}
-		c.Next()  // process request
+		c.Next()  
 	
 		// After request processing
 		fmt.Printf("Response Headers:\n")
