@@ -5,6 +5,7 @@ import (
 	"log"
 	"tbibi_back_end_go/db"
 	"tbibi_back_end_go/routes"
+	"tbibi_back_end_go/services"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -51,6 +52,8 @@ func main() {
 	
 	defer conn.Close()
 
+	r.GET("/ws", services.ServeWs)
+
 	// Initialize routes
 	routes.SetupPatientRoutes(r, conn)
 	routes.SetupDoctorRoutes(r, conn)
@@ -58,7 +61,7 @@ func main() {
 	routes.SetupFileRoutes(r, conn)
 	routes.SetupAccountValidationRoutes(r, conn)
 	routes.SetupShareRoutes(r, conn)
-
+	routes.SetupChatRoutes(r, conn)
 
 
 

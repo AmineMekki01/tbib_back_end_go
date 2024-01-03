@@ -131,6 +131,33 @@ func InitDatabase() (*pgxpool.Pool, error) {
 			item_id uuid REFERENCES folder_file_info(id)
 		)`,
 
+		`CREATE TABLE IF NOT EXISTS chats (
+			id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+			created_at TIMESTAMP NOT NULL,
+			updated_at TIMESTAMP NOT NULL,
+			deleted_at TIMESTAMP
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS participants (
+			id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+			chat_id uuid NOT NULL,
+			user_id uuid NOT NULL,
+			joined_at TIMESTAMP NOT NULL,
+			created_at TIMESTAMP NOT NULL,
+			updated_at TIMESTAMP NOT NULL,
+			deleted_at TIMESTAMP
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS messages (
+			id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+			chat_id uuid NOT NULL,
+			sender_id uuid NOT NULL,
+			content TEXT NOT NULL,
+			created_at TIMESTAMP NOT NULL,
+			updated_at TIMESTAMP NOT NULL,
+			deleted_at TIMESTAMP
+		)`,
+
 
 	}
 
